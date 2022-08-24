@@ -11,10 +11,6 @@ const { name } = JSON.parse(fs.readFileSync(resolve(dirname((fileURLToPath(impor
 const defaultOptions = {
     filters: {},
     globals: {},
-    partials: {
-        directory: null,
-        extname: true
-    },
     data: '',
     filetypes: {
         html: /.(json.html|pug.json.html|pug.html)$/,
