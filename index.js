@@ -15,7 +15,8 @@ const defaultOptions = {
     filetypes: {
         html: /.(json.html|pug.json.html|pug.html)$/,
         json: /.(json.pug.html)$/
-    }
+    },
+    compileOptions: {}
 }
 
 function processData(paths, data = {}) {
@@ -43,16 +44,17 @@ const renderTemplate = async(filename, content, options) => {
     ) {
         lodash.merge(context, JSON.parse(fs.readFileSync(filename).toString()))
 
+        isTemplate = true
+
         context.template = relative(process.cwd(), context.template)
     } else if (fs.existsSync(filename + '.json')) {
         lodash.merge(context, JSON.parse(fs.readFileSync(filename + '.json').toString()))
     }
 
     try {
-        const template = pug.compileFile(isTemplate ? context.template : filename, {
-            basedir: options.root,
+        const template = pug.compileFile(isTemplate ? context.template : filename, Object.assign(options.compileOptions, {
             filters: options.filters
-        })
+        }))
 
         output.content = template(context)
     } catch(error) {
