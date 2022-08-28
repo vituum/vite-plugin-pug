@@ -4,9 +4,13 @@
 # ⚡️🐕 VitePug
 
 ```js
+import pug from '@vituum/vite-plugin-pug'
+
 export default {
   plugins: [
     pug({
+      reload: true,
+      root: null,
       filters: {},
       data: '*.json',
       globals: {
@@ -15,11 +19,16 @@ export default {
       filetypes: {
           html: /.(json.html|pug.json.html|pug.html)$/,
           json: /.(json.pug.html)$/
-      }
+      },
+      pug: {}
     })
   ]
 }
 ```
+
+Read the [docs](https://vituum.dev/config/integrations-options.html#vituum-pug) to learn more about the plugin options.
+
+## Basic usage
 
 ```html
 <!-- index.html -->
@@ -33,7 +42,7 @@ export default {
 or
 ```html
 <!-- index.pug.html -->
-{{> "path/to/template.hbs"}}
+include /path/to/template.pug
 ```
 or
 ```html
@@ -47,3 +56,4 @@ or
 ### Requirements
 
 - [Node.js LTS (16.x)](https://nodejs.org/en/download/)
+- [Vite](https://vitejs.dev/) or [Vituum](https://vituum.dev/)
