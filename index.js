@@ -1,138 +1,147 @@
-import { dirname, resolve, relative } from 'path'
+import { resolve, relative } from 'path'
 import fs from 'fs'
 import process from 'node:process'
-import FastGlob from 'fast-glob'
 import lodash from 'lodash'
 import pug from 'pug'
-import chalk from 'chalk'
-import { fileURLToPath } from 'url'
+import { getPackageInfo, merge, pluginBundle, pluginError, pluginReload, processData } from 'vituum/utils/common.js'
+import { renameBuildEnd, renameBuildStart } from 'vituum/utils/build.js'
+import { minimatch } from 'minimatch'
 
-const { name } = JSON.parse(fs.readFileSync(resolve(dirname((fileURLToPath(import.meta.url))), 'package.json')).toString())
+const { name } = getPackageInfo(import.meta.url)
+
+/**
+ * @type {import('@vituum/vite-plugin-pug/types').PluginUserConfig}
+ */
 const defaultOptions = {
     reload: true,
     root: null,
     filters: {},
-    globals: {},
-    data: '',
-    filetypes: {
-        html: /.(json.html|pug.json.html|pug.html)$/,
-        json: /.(json.pug.html)$/
+    globals: {
+        format: 'pug'
     },
-    pug: {}
+    data: ['src/data/**/*.json'],
+    formats: ['pug', 'json.pug', 'json'],
+    options: {}
 }
 
-function processData(paths, data = {}) {
-    let context = {}
-
-    lodash.merge(context, data)
-
-    const normalizePaths = Array.isArray(paths) ? paths.map(path => path.replace(/\\/g, '/')) : paths.replace(/\\/g, '/')
-
-    FastGlob.sync(normalizePaths).forEach(entry => {
-        const path = resolve(process.cwd(), entry)
-
-        context = lodash.merge(context, JSON.parse(fs.readFileSync(path).toString()))
-    })
-
-    return context
-}
-
-const renderTemplate = async(filename, content, options) => {
+const renderTemplate = async ({ filename, server, root }, content, options) => {
+    const initialFilename = filename.replace('.html', '')
     const output = {}
-    const context = options.data ? processData(options.data, options.globals) : options.globals
+    const context = options.data
+        ? processData({
+            paths: options.data,
+            root
+        }, options.globals)
+        : options.globals
 
-    const isJson = filename.endsWith('.json.html') || filename.endsWith('.json')
-    const isHtml = filename.endsWith('.html') && !options.filetypes.html.test(filename) && !options.filetypes.json.test(filename) && !isJson
-
-    if (isJson || isHtml) {
-        lodash.merge(context, isHtml ? content : JSON.parse(fs.readFileSync(filename).toString()))
+    if (initialFilename.endsWith('.json')) {
+        lodash.merge(context, JSON.parse(content))
 
         output.template = true
 
         if (typeof context.template === 'undefined') {
-            console.error(chalk.red(name + ' template must be defined - ' + filename))
+            const error = `${name}: template must be defined for file ${initialFilename}`
+
+            return new Promise((resolve) => {
+                output.error = error
+                resolve(output)
+            })
         }
 
         context.template = relative(process.cwd(), context.template).startsWith(relative(process.cwd(), options.root)) ? resolve(process.cwd(), context.template) : resolve(options.root, context.template)
-    } else if (fs.existsSync(filename + '.json')) {
-        lodash.merge(context, JSON.parse(fs.readFileSync(filename + '.json').toString()))
+    } else if (fs.existsSync(`${initialFilename}.json`)) {
+        lodash.merge(context, JSON.parse(fs.readFileSync(`${initialFilename}.json`).toString()))
     }
 
-    try {
-        const template = pug.compileFile(output.template ? context.template : filename, Object.assign(options.pug, {
-            basedir: options.root,
-            filters: options.filters
-        }))
+    return new Promise((resolve) => {
+        try {
+            const template = pug.compileFile(output.template ? context.template : filename, Object.assign(options.options, {
+                basedir: options.root,
+                filters: options.filters
+            }))
 
-        output.content = template(context)
-    } catch (error) {
-        output.error = error
-    }
+            output.content = template(context)
 
-    return output
+            resolve(output)
+        } catch (error) {
+            output.error = error
+
+            resolve(output)
+        }
+    })
 }
 
+/**
+ * @param {import('@vituum/vite-plugin-pug/types').PluginUserConfig} options
+ * @returns [import('vite').Plugin]
+ */
 const plugin = (options = {}) => {
-    options = lodash.merge(defaultOptions, options)
+    let resolvedConfig
+    let userEnv
 
-    return {
+    options = merge(defaultOptions, options)
+
+    return [{
         name,
-        config: ({ root }) => {
+        config (userConfig, env) {
+            userEnv = env
+        },
+        configResolved (config) {
+            resolvedConfig = config
+
             if (!options.root) {
-                options.root = root
+                options.root = config.root
             }
         },
-        transformIndexHtml: {
-            enforce: 'pre',
-            async transform(content, { path, filename, server }) {
-                path = path.replace('?raw', '')
-                filename = filename.replace('?raw', '')
+        buildStart: async () => {
+            if (userEnv.command !== 'build') {
+                return
+            }
 
+            await renameBuildStart(resolvedConfig.build.rollupOptions.input, options.formats)
+        },
+        buildEnd: async () => {
+            if (userEnv.command !== 'build') {
+                return
+            }
+
+            await renameBuildEnd(resolvedConfig.build.rollupOptions.input, options.formats)
+        },
+        transformIndexHtml: {
+            order: 'pre',
+            async transform (content, { path, filename, server }) {
                 if (
-                    !options.filetypes.html.test(path) &&
-                    !options.filetypes.json.test(path) &&
-                    !content.startsWith('<script type="application/json" data-format="pug"')
+                    !options.formats.find(format => filename.replace('.html', '').endsWith(format)) ||
+                    (filename.replace('.html', '').endsWith('.json') && !content.startsWith('{'))
                 ) {
                     return content
                 }
 
-                if (content.startsWith('<script type="application/json" data-format="pug"')) {
-                    const matches = content.matchAll(/<script\b[^>]*data-format="(?<format>[^>]+)"[^>]*>(?<data>[\s\S]+?)<\/script>/gmi)
-
-                    for (const match of matches) {
-                        content = JSON.parse(match.groups.data)
-                    }
+                if (
+                    (filename.replace('.html', '').endsWith('.json') && content.startsWith('{')) &&
+                    (JSON.parse(content)?.format && !options.formats.includes(JSON.parse(content)?.format))
+                ) {
+                    return content
                 }
 
-                const render = await renderTemplate(filename, content, options)
+                if (options.ignoredPaths.find(ignoredPath => minimatch(path.replace('.html', ''), ignoredPath) === true)) {
+                    return content
+                }
 
-                if (render.error) {
-                    if (!server) {
-                        console.error(chalk.red(render.error))
-                        return
-                    }
+                const render = await renderTemplate({ filename, server, root: resolvedConfig.root }, content, options)
+                const renderError = pluginError(render.error, server, name)
 
-                    setTimeout(() => server.ws.send({
-                        type: 'error',
-                        err: {
-                            message: render.error.message,
-                            plugin: name
-                        }
-                    }), 50)
+                if (renderError && server) {
+                    return
+                } else if (renderError) {
+                    return renderError
                 }
 
                 return render.content
             }
         },
-        handleHotUpdate({ file, server }) {
-            if (
-                (typeof options.reload === 'function' && options.reload(file)) ||
-                (options.reload && (options.filetypes.html.test(file) || options.filetypes.json.test(file)))
-            ) {
-                server.ws.send({ type: 'full-reload' })
-            }
-        }
-    }
+        handleHotUpdate: ({ file, server }) => pluginReload({ file, server }, options)
+    }, pluginBundle(options.formats)]
 }
 
 export default plugin
