@@ -32,6 +32,6 @@ export interface PluginUserConfig {
     globals?: Object
     data?: string | string[]
     formats?: string[]
-    options?: PugOptions
     ignoredPaths?: string[]
+    options?: PugOptions
 }

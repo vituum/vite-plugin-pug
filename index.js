@@ -21,6 +21,7 @@ const defaultOptions = {
     },
     data: ['src/data/**/*.json'],
     formats: ['pug', 'json.pug', 'json'],
+    ignoredPaths: [],
     options: {}
 }
 
@@ -55,7 +56,7 @@ const renderTemplate = async ({ filename, server, root }, content, options) => {
 
     return new Promise((resolve) => {
         try {
-            const template = pug.compileFile(output.template ? context.template : filename, Object.assign(options.options, {
+            const template = pug.compileFile(output.template ? context.template : server ? initialFilename : filename, Object.assign(options.options, {
                 basedir: options.root,
                 filters: options.filters
             }))

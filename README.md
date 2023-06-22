@@ -15,11 +15,10 @@ export default {
             input: ['index.pug.html']
         }
     }
-    
 }
 ```
 
-* Read the [docs](https://vituum.dev/plugins/pug) to learn more about the plugin options.
+* Read the [docs](https://vituum.dev/plugins/pug.html) to learn more about the plugin options.
 * Use with [Vituum](https://vituum.dev) to get full functionality.
 
 ## Basic usage
