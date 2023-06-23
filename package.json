@@ -1,6 +1,6 @@
 {
   "name": "@vituum/vite-plugin-pug",
-  "version": "1.0.0-alpha.2",
+  "version": "1.0.0-beta.1",
   "type": "module",
   "main": "index.js",
   "scripts": {
@@ -11,8 +11,7 @@
     "pug": "^3.0.2",
     "lodash": "^4.17.21",
     "fast-glob": "^3.2.12",
-    "vituum": "^1.0.0-alpha.23",
-    "minimatch": "^9.0.1"
+    "vituum": "^1.0.0-beta.3"
   },
   "devDependencies": {
     "@types/node": "^20.3.1",
