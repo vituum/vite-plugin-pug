@@ -4,7 +4,7 @@ import lodash from 'lodash'
 import pug from 'pug'
 import {
     getPackageInfo,
-    merge, normalizePath,
+    merge,
     pluginBundle,
     pluginMiddleware,
     pluginReload,

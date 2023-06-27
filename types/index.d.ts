@@ -35,3 +35,5 @@ export interface PluginUserConfig {
     ignoredPaths?: string[]
     options?: PugOptions
 }
+
+export default function plugin(options?: PluginUserConfig) : import('vite').Plugin
