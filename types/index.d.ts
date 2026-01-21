@@ -36,4 +36,4 @@ export interface PluginUserConfig {
     options?: PugOptions
 }
 
-export default function plugin(options?: PluginUserConfig) : import('vite').Plugin
+export default function plugin(options?: PluginUserConfig) : import('vite').Plugin[]
