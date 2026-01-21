@@ -82,7 +82,7 @@ const renderTemplate = async ({ filename, server, resolvedConfig }, content, opt
 
 /**
  * @param {import('@vituum/vite-plugin-pug/types').PluginUserConfig} options
- * @returns [import('vite').Plugin]
+ * @returns {import('vite').Plugin[]}
  */
 const plugin = (options = {}) => {
   let resolvedConfig
@@ -118,6 +118,7 @@ const plugin = (options = {}) => {
     },
     transformIndexHtml: {
       order: 'pre',
+      /** @returns {Promise<string | Object>} */
       async handler(content, { path, filename, server }) {
         return pluginTransform(content, { path, filename, server }, { name, options, resolvedConfig, renderTemplate })
       },
